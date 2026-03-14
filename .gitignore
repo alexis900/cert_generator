@@ -1,1 +1,10 @@
 .env
+*.crt
+*.key
+*.csr
+*.cnf
+*.pem
+*.srl
+*.der
+*.pfx
+*.p12

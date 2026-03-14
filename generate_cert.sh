@@ -2,7 +2,36 @@
 set -e
 
 # Cargar configuración desde .env
-source "$(dirname "$0")/.env"
+ENV_FILE="$(dirname "$0")/.env"
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "Error: No se encontró .env en $ENV_FILE"
+  exit 1
+fi
+source "$ENV_FILE"
+
+# Validaciones básicas
+if ! command -v openssl >/dev/null 2>&1; then
+  echo "Error: openssl no está disponible en el PATH"
+  exit 1
+fi
+
+REQUIRED_VARS=(CERTS_DIR CA_CERT CA_KEY DAYS_VALID ORGANIZATION)
+for var in "${REQUIRED_VARS[@]}"; do
+  if [[ -z "${!var}" ]]; then
+    echo "Error: variable requerida vacía en .env: $var"
+    exit 1
+  fi
+done
+
+if [[ ! -f "$CA_CERT" ]]; then
+  echo "Error: CA_CERT no existe: $CA_CERT"
+  exit 1
+fi
+
+if [[ ! -f "$CA_KEY" ]]; then
+  echo "Error: CA_KEY no existe: $CA_KEY"
+  exit 1
+fi
 
 if [[ $# -lt 1 ]]; then
   echo "Uso: $0 <CN> [SAN1] [SAN2] [...]"
@@ -14,9 +43,16 @@ CN="$1"
 shift
 SANS=("$@")  # SANs adicionales
 
+# Validar CN básico (evita rutas inesperadas)
+if [[ "$CN" =~ [/\ ] ]]; then
+  echo "Error: el CN no puede contener '/' ni espacios"
+  exit 1
+fi
+
 mkdir -p "$CERTS_DIR/$CN"
 
 # 1. Generar clave privada
+umask 077
 openssl genrsa -out "$CERTS_DIR/$CN/$CN.key" 4096
 
 # 2. Generar configuración con SANs
